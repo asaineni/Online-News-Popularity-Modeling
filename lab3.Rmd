@@ -1,0 +1,327 @@
+---
+title: "R Notebook"
+author: "Akhila Saineni"
+date: "11/29/2020"
+output:
+  pdf_document: default
+  html_notebook: default
+  word_document: default
+---
+
+
+```{r Wholesale}
+data = read.csv("Wholesale_customers_data.csv")
+summary(data)
+```
+
+
+```{r Wholesale customers dataset}
+top.n.custs = function (data,cols,n=5) { #Requires some data frame and the top N to remove
+idx.to.remove =integer(0) #Initialize a vector to hold customers being removed
+for (c in cols){ # For every column in the data we passed to this function
+col.order =order(data[,c],decreasing=T) #Sort column "c" in descending order (bigger on top)
+#Order returns the sorted index (e.g. row 15, 3, 7, 1, ...) rather than the actual values sorted.
+idx =head(col.order, n) #Take the first n of the sorted column C to
+idx.to.remove =union(idx.to.remove,idx) #Combine and de-duplicate the row ids that need to be removed
+}
+return(idx.to.remove) #Return the indexes of customers to be removed
+}
+```
+
+```{r removed}
+
+top.custs =top.n.custs(data,cols=3:8,n=5)
+length(top.custs)
+
+
+top.custs =top.n.custs(data, cols = 1:5,n=5)
+length(top.custs)
+
+data[top.custs,]
+
+
+```
+
+
+
+```{r wholesale model}
+data.rm.top=data[-c(top.custs),] #Remove the Customers
+set.seed(76964057) #Set the seed for reproducibility
+k =kmeans(data.rm.top[,-c(1,2)], centers=9) #Create 9 clusters, Remove columns 1 and 2
+k$centers #Display&nbsp;cluster centers
+k$size
+
+```
+
+```{r plot k means}
+
+#install.packages("ggpubr")
+library("ggpubr")
+library("factoextra")
+
+
+fviz_cluster(k, data = data.rm.top[,-c(1,2)],
+             geom = "point",
+             ellipse.type = "convex", 
+             ggtheme = theme_bw()
+             )
+
+
+
+```
+
+
+```{r optimum value of k}
+rng=2:20 #K from 2 to 20
+tries =100 #Run the K Means algorithm 100 times
+avg.totw.ss =integer(length(rng)) #Set up an empty vector to hold all of points
+for(v in rng){ # For each value of the range variable
+v.totw.ss =integer(tries) #Set up an empty vector to hold the 100 tries
+for(i in 1:tries){
+k.temp =kmeans(data.rm.top,centers=v) #Run kmeans
+v.totw.ss[i] =k.temp$tot.withinss#Store the total withinss
+}
+avg.totw.ss[v-1] =mean(v.totw.ss) #Average the 100 total withinss
+}
+plot(rng,avg.totw.ss,type="b", main="Total Within SS by Various K",
+ylab="Average Total Within Sum of Squares",
+xlab="Value of K")
+
+
+```
+
+
+```{r empirical}
+
+sqrt(422)/2
+
+```
+Q1- Given this is an imperfect real-world, you need to determine what you believe is the best value for “k” and write-up this portion of your lab report.
+You should include a brief discussion of your k-Means analysis as well as the best value of “k” that you determine. You should include what mixture of variables within the clusters that this value of “k” results in. That is, you need to interpret your k-Means analysis and discuss what it means.
+
+Answer:
+
+As for the identification of the best value of k in the kMeans algorithm, 2 methods are used Empirical and Elbow method. The empirical method recommends that 10 clusters are required whereas the elbow method analysis, considering 19 different clusterings that are ranging from 2 to 20 clusters and comparing the respective within sum of the squares, in other words the similarity of the points within the cluster. However the higher the number, the lower is the similarity. Each K means algorithm is set to run 100 times in order to achieve the centroids of each cluster. Upon looking at the elbow curve, the within sum is gradually decreasing and the 20 cluster model has the least average total within the sum. In this case 9 clusters are chosen based on the fact that the within sum is low as well as the fact that there won't be much difference in the average within sum after 9 clusters. The centers of the 9 clusters along with the size of each of the cluster is available above. The above plot depicts the points in each cluster.
+
+
+Q2- How many points do you see in each cluster?
+74  16  34  44  17 137   2  61  37 are the points within each of the 9 cluster. All these clusters are nominal but not ordinal.
+
+
+
+```{r wine dataset}
+wssplot = function(data, nc=15, seed=1234){
+wss =(nrow(data)-1)*sum(apply(data,2,var))
+for (i in 2:nc){
+set.seed(seed)
+wss[i] = sum(kmeans(data, centers=i)$withinss)}
+plot(1:nc, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")}
+
+
+
+
+#Load data into R/RStudio and view it
+wine = read.csv("wine.csv")
+df = scale(wine[-1])
+#Examine the data frame and plot the within sum of squares
+head(df)
+wssplot(df)
+
+
+
+
+```
+
+```{r nbclust}
+
+#Start the k-Means analysis using the variable "nc" for the number of clusters
+library("NbClust")
+set.seed(1234)
+nc = NbClust(df, min.nc=2, max.nc = 15, method = "kmeans")
+print(table(nc$Best.n[1,]))
+barplot(table(nc$Best.n[1,]), xlab = "Number of Clusters", ylab = "Number of Criteria", main = "Number of Clusters Chosen by 26 Criteria")
+
+```
+
+
+```{r best number of clusters}
+#Enter the best number of clusters based on the information in the table and barplot
+n = readline(prompt = "Enter the best number of clusters: ")
+n = as.integer(n)
+n
+```
+```{r kmeans wine}
+#Conduct the k-Means analysis using the best number of clusters
+set.seed(1234)
+fit.km = kmeans(df, 3, nstart=25)
+print(fit.km$size)
+print(fit.km$centers)
+print(aggregate(wine[-1], by=list(cluster=fit.km$cluster), mean))
+
+
+```
+
+```{r confusion}
+
+ct.km = table(wine$Wine, fit.km$cluster)
+print(ct.km)
+#Generate a plot of the clusters
+library(cluster)
+clusplot(df, fit.km$cluster, main='2D representation of the Cluster solution',
+color=TRUE, shade=TRUE,
+labels=2, lines=0)
+
+```
+
+
+
+
+
+Part 2 Write Up: 
+In the above implementation/analysis, the wine dataset is scaled and later K-means algorithm is performed using the wssplot function for different k values from 1 to 15. After that based on the Hubert and D index, I have come to a understanding that 3 clusters is the best value of K. The size of the 3 clusters are 62, 65 and 51. The centers of the clusters as mentioned above. The 2D representation of the cluster is also mentioned above with the 2 components that explains around 55% of the variability. Later based on the confusion matrix we can determine that only 6 out of 178 are misclassified, i.e the k means algorithm is successful in classifying the type of the wine by 96%
+
+
+
+
+
+```{r classification of wines}
+
+library(rpart)
+df = data.frame(k=fit.km$cluster, df)
+print(str(df))
+#Randomize the dataset
+rdf = df[sample(1:nrow(df)), ]
+print(head(rdf))
+train = rdf[1:(as.integer(.8*nrow(rdf))-1), ]
+test = rdf[(as.integer(.8*nrow(rdf))):nrow(rdf), ]
+#Train the classifier and plot the results
+fit = rpart(k ~ ., data=train, method="class")
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+fancyRpartPlot(fit)
+#Now use the predict() function to see how well the model works
+pred=predict(fit, test, type="class")
+print(table(pred, test$k))
+
+
+
+```
+
+Part 3 
+
+Write Up:
+As mentioned above,we have a 4% misclassification in the K means algorithm. The classification algorithm above clearly predicted the cluster without any misclassifaction (from the truth table). This tells us that the 4 % misclassification will be present in our k means algorithm and this also can be estimated. This misclassifcation will flow through the entire analysis based on the fact that, the classification method used above followed the same clustering format as the k means algorithm. 
+
+
+
+Q3- Load the dataset of breast cancer. Do the preliminary analysis and implement a KNN (K- nearest neighbors) model for this dataset and don’t forget that whenever it is required you should use: set.seed(12345).
+
+```{r part4 breastcancer}
+
+bc= read.csv("wisc_bc_data.csv")
+
+
+nor =function(x) { (x -min(x))/(max(x)-min(x))   }
+#bc_norm<-as.data.frame(lapply(bc[,c(-1,-2)], nor))
+
+set.seed(12345)
+bc_rand =bc[order(runif(569)), ]
+
+
+bc_train = bc[1:455, ]
+bc_test = bc_rand[456:569, ]
+
+bc_train_norm = as.data.frame(lapply(bc_train[,c(-1,-2)], nor))
+bc_test_norm= as.data.frame(lapply(bc_test[,c(-1,-2)], nor))
+
+
+#install.packages("class")
+
+library(class)
+
+pr=knn(train =bc_train_norm , test =bc_test_norm, cl=bc_train$diagnosis, k=13)
+
+
+
+ tab = table(pr,bc_test$diagnosis)
+ 
+ tab
+ 
+ accuracy = function(x){sum(diag(x)/(sum(rowSums(x)))) * 100}
+ accuracy(tab)
+
+```
+Part 4 Q1 Write up: 
+Using the wisc_bc_data.csv dataset, I have implemented a KNN algorithm, where we first split the data into train(80%) & test(20%) with seed set to 12345. Then we have normalized the data, so that all values are between 0 and 1. Various values of K have been tried and the best value of K is 13, Where we achieve a 100% accuracy in the model. 
+
+
+
+```{r news popularity load data}
+
+news_p=read.csv("OnlineNewsPopularity_for_R.csv")
+
+
+head(news_p)
+str(news_p)
+
+colnames(news_p)
+
+news_p = news_p[,c("n_tokens_title", "n_tokens_content", "n_unique_tokens", "n_non_stop_words", "num_hrefs","num_self_hrefs", "num_imgs", "num_videos","average_token_length", "num_keywords", "kw_max_max", "global_sentiment_polarity", "avg_positive_polarity", "title_subjectivity", "title_sentiment_polarity", "abs_title_subjectivity", "abs_title_sentiment_polarity", "shares")]
+for(i in 1:39644) {
+
+  
+ news_p$fav[i]= if( news_p$shares[i]>=1400) {"YES"} else {"NO"}
+
+}
+
+
+
+```
+
+
+```{r randomize and normalize news popularity}
+
+
+set.seed(12345)
+news_p_rand = news_p[order(runif(10000)), ]
+
+
+news_ptrain = news_p_rand[1:9000, ]
+news_ptest = news_p_rand[9001:10000, ]
+
+#prop.table(table(news_ptrain$fav))
+#prop.table(table(news_ptest$fav))
+
+
+
+nor =function(x) { (x -min(x))/(max(x)-min(x))   }
+
+
+news_ptrain_norm = as.data.frame(lapply(news_ptrain[,c(-18,-19)], nor))
+news_ptest_norm= as.data.frame(lapply(news_ptest[,c(-18,-19)], nor))
+
+```
+
+
+```{r knn news popularity}
+
+pr2=knn(train =news_ptrain_norm , test =news_ptest_norm, cl=news_ptrain$fav, k=499)
+
+ tab2 = table(pr2,news_ptest$fav)
+ 
+ tab2
+ 
+ accuracy2 = function(x){sum(diag(x)/(sum(rowSums(x)))) * 100}
+ accuracy2(tab2)
+
+
+```
+
+Part 4 Q2 Write up:
+I have implemented the KNN algorithm on the news popularity dataset with various K values, the best output is when the K value is 499. The accuracy of the model is 59% which is much less than the accuracy achieved with svm polynomial kernel. I have used a trial and error method by trying various K values to see which one yeild higher accuracy. 
+
+
+
+
+
