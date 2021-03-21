@@ -1,0 +1,188 @@
+---
+title: "akhilasaineni_Lab1"
+author: "Akhila Saineni"
+date: "10/18/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+### 1 Tree- Based Classification
+
+```{r read_credit}
+credit <- read.csv("/Users/akhilasaineni/Downloads/HU/2020Fall/ANLY_530_MachineLearning1/Lab1/credit.csv") 
+str(credit)
+summary(credit$Credit.Amount)
+table(credit$Creditability)
+
+#Creating random 
+set.seed(12345) 
+credit_rand <- credit[order(runif(1000)), ]
+summary(credit$ Credit.Amount)
+
+credit_train <- credit_rand[1:900, ] 
+credit_test <- credit_rand[901:1000, ]
+
+prop.table(table(credit_train$ Creditability))
+prop.table(table(credit_test$ Creditability))
+
+#install.packages("C50")
+library(C50)
+
+credit_model <- C5.0(x = credit_train[-1], y = as.factor(credit_train$Creditability)) 
+summary(credit_model)
+
+#install.packages("gmodels")
+library(gmodels)
+cred_pred <- predict(credit_model, credit_test)
+CrossTable(credit_test$Creditability, cred_pred, prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE, 
+           dnn = c( 'Actual Creditability', 'Predicted Creditability'))
+```
+
+#### Q1 If you see an accuracy of 100%, what does it mean? Does this mean that we design a perfect model? This is some thing that needs more discussion. Write a few sentences about accuracy of 100%.
+
+When the accuracy of a model is 100% then it means that the model is able to predict accurately each and every single observation. This means that there is no Type 1 error or Type 2 error. On the other side, accuracy of 100% doesn't mean that the model is perfect because the model may have been overfitted or overtrained. 
+
+### 2 Random Forest
+
+```{r randomforest}
+#install.packages("randomForest") 
+library("randomForest")
+
+credit_train$Creditability <- as.factor(credit_train$Creditability) 
+random_model <- randomForest(Creditability ~ . , data= credit_train) 
+summary(random_model)
+
+cred_pred <- predict(random_model, credit_test) 
+(p <- table(cred_pred, credit_test$Creditability))
+
+(Accuracy <- sum(diag(p))/sum(p)*100) 
+importance(random_model)
+```
+
+#### Q2 What are the three most important features in this model.
+
+The following are the most important features based on the Gini Score 
+Account.Balance 
+Duration.of.credit..month. 
+Payment.status.of.previous.credit
+
+```{r random}
+set.seed(23458) 
+random_model_seed_change <- randomForest(Creditability ~ . , data=credit_train) 
+
+cred_pred_seed_change <- predict(random_model_seed_change, credit_test) 
+p_seed_change <- table(cred_pred_seed_change, credit_test$Creditability) 
+(Accuracy_seed_change <- sum(diag(p_seed_change))/sum(p_seed_change)*100)
+
+p_seed_change
+```
+
+The accuracy of the model with seed change remained close to the one with the previous seed 80% & 82% respectively.
+
+### 3 Adding Regression to Trees
+
+```{r whitewines}
+wine <- read.csv("whitewines.csv") 
+str(wine)
+
+hist(wine$quality)
+
+wine_train <- wine[1:3750, ] 
+wine_test <- wine[3751:4898, ] 
+
+#install.packages("rpart.plot") 
+library(rpart)
+
+m.rpart <- rpart(quality ~ ., data=wine_train) 
+m.rpart
+
+library(rpart.plot)
+rpart.plot(m.rpart, digits=3)
+
+rpart.plot(m.rpart, digits=4, fallen.leaves = TRUE, type = 3, extra = 101)
+
+p.rpart <- predict(m.rpart, data=wine_test) 
+summary(p.rpart)
+
+summary(wine_test$quality)
+```
+
+#### Q3 What is your interpretation about this amount of RMSE?
+
+The absolute measure of the fit is called the Root Mean Square Error. If the RMSE score is low that means that the predictions are close to the actual data whereas if the RMSE score is high, it means that the model is not predicting as expected.
+
+### 4 News Popularity
+
+```{r news_pop}
+news_p<-read.csv("OnlineNewsPopularity_for_R.csv") 
+head(news_p)
+str(news_p) 
+colnames(news_p)
+
+news_p <- news_p[,c("n_tokens_title", "n_tokens_content", "n_unique_tokens", "n_non_stop_words", "num_hrefs","num_self_hrefs", "num_imgs", "num_videos","average_token_length", "num_keywords", "kw_max_max", "global_sentiment_polarity", "avg_positive_polarity", "title_subjectivity", "title_sentiment_polarity", "abs_title_subjectivity", "abs_title_sentiment_polarity", "shares")]
+
+#We want to make this problem a classification one. One approach is to make any piece of article more than 1400 likes as a favorite one
+
+#We will be using shares instead of likes 
+for(i in 1:39644) { 
+  news_p$fav[i]<- if( news_p$shares[i]>=1400) {"YES"} else {"NO"} 
+  } 
+
+head(news_p)
+
+set.seed(12345) 
+news_p_rand <- news_p[order(runif(10000)), ] 
+news_ptrain <- news_p_rand[1:9000, ] 
+news_ptest <- news_p_rand[9001:10000, ] 
+prop.table(table(news_ptrain$fav))
+prop.table(table(news_ptest$fav))
+
+library(C50) 
+newsp_model <- C5.0(x = news_ptrain[,c(-19,-18)], y = as.factor(news_ptrain$fav))
+summary(newsp_model)
+
+fav_pred <- predict(newsp_model, news_ptest) 
+library(gmodels) 
+CrossTable(news_ptest$fav, fav_pred, prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE, dnn = c( 'Actual Favorite', 'Predicted Favorite'))
+```
+
+It can be seen that 59% accuracy is with the above model. Let's implement another model.
+
+```{r random_forest}
+
+library(randomForest)
+
+news_p_random_forest_model<- randomForest(as.factor(fav)~.,data=news_ptrain[,-18]) 
+summary(news_p_random_forest_model)
+
+fac_pred_rf <- predict(news_p_random_forest_model, news_ptest)
+(p <- table(fac_pred_rf, news_ptest$fav))
+
+(Accuracy <- sum(diag(p))/sum(p)*100)
+importance(news_p_random_forest_model)
+```
+
+From the above, it can be seen that by using random forest, an accuracy of 60.5% is achieved that is relatively higher than that of the previous Tree based classification model. 
+
+### Summary:
+
+Upon implementing both Decision Tree and Random Forest algorithm approaches on the News Popularity dataset to predict if a certain news is a favorite among and to understand the share in the market, a conclusion can be made that both the models have obtained similar results in terms of accuracy. The Tree based classification model has an accuracy of 59% whereas the Random Forest Model has an accuracy of 60.5%.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
