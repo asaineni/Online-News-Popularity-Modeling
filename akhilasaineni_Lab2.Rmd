@@ -1,0 +1,277 @@
+---
+title: "akhilasaineni_Lab2"
+author: "Akhila Saineni"
+date: "11/15/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Lab 2: Naive Bayes Classifiers 
+### Part 1
+
+
+### Step 1 Loading the data
+```{r loading1}
+library(readr)
+credit_data = read.csv("/Users/akhilasaineni/Downloads/HU/2020Fall/ANLY_530_MachineLearning1/Lab2/creditData.csv")
+
+str(credit_data)
+summary(credit_data)
+sum(is.na(credit_data))
+#No NAs in the data
+
+# converting the class variable
+credit_data$Creditability = as.factor(credit_data$Creditability)
+sum(is.na(credit_data))
+
+# splitting dataset into training and test datasets
+set.seed(100)
+
+# randomizing and splitting
+credit_random = credit_data[order(runif(1000)),]
+credit_train = credit_random[1:750,]
+credit_test = credit_random[751:1000,]
+
+prop.table(table(credit_train$Creditability))
+```
+
+### Step 2 Training the Model on the Data
+```{r train1}
+#install.packages("naivebayes")
+library(naivebayes)
+
+nb_model = naive_bayes(Creditability ~ ., data = credit_train)
+nb_model
+summary(nb_model)
+```
+
+### Step 3 Model Performance Evaluation 
+```{r model1}
+(naiveBayes_model_nat = table(predict(nb_model, credit_test), credit_test$Creditability))
+(Accuracy = sum(diag(naiveBayes_model_nat))/sum(naiveBayes_model_nat)*100)
+```
+In the first part of the assignment, Naive Bayesian method is applied to train the prediction model. Firstly, the dataset is split into training and test datasets in a 75:25 ratio. In order to test the accuracy of the model, the test dataset is used to determine that our model has an accuracy of 71.6%.
+
+### Part 2
+This part of the assignment is to improve the performance of the Naive Bayes classifier.
+
+### Step 1 Loading and exploring the dataset
+```{r loading2}
+library(colorspace)
+library(ggplot2)
+library(minqa)
+library(nloptr)
+library(lattice)
+#install.packages("caTools")
+library(caTools)
+#install.packages("MatrixModels")
+library(MatrixModels)
+#install.packages("tmvnsim")
+library(tmvnsim)
+library(psych)
+library(caret)
+
+#highlycor <- findCorrelation(m, 0.30)
+
+credit_random = credit_data[order(runif(1000)), ]
+
+creditScaled = scale(credit_random[,2:ncol(credit_random)], center=TRUE, scale = TRUE)
+
+corr_matrix = cor(creditScaled)
+high_correlation = findCorrelation(corr_matrix, 0.30)
+
+#preparing test data
+filtered_data = credit_random[, -(high_correlation[5]+1)]
+filtered_training = filtered_data[1:750, ]
+filtered_test = filtered_data[751:1000, ]
+```
+
+### Step 2 Training the Model on the Filtered Data
+```{r train2}
+library(naivebayes)
+naivebayes_model <- naive_bayes(Creditability ~ ., data=filtered_training)
+
+naivebayes_model
+```
+
+### Step 3 Model Performance Evaluation
+```{r model2}
+filtered_test_prediction <- predict(naivebayes_model, newdata = filtered_test)
+table(filtered_test_prediction, filtered_test$Creditability)
+
+naiveBayes_model2_nat<- table(filtered_test_prediction, filtered_test$Creditability)
+(Accuracy <- sum(diag(naiveBayes_model2_nat))/sum(naiveBayes_model2_nat)*100)
+
+```
+As part of the assignment part2, an attempt is made to improve the accuracy of the Naive Bayesian model by filtering the dataset used in the model. The new model has an accuracy of 3% higher than the original model, i.e. 74.4%. Hence, it is safe to say that the performance of the model has significantly increased.
+
+## Part 3
+
+### Step 1 Loading the Data
+```{r loading3}
+#loading the data
+letter_data = read.csv("/Users/akhilasaineni/Downloads/HU/2020Fall/ANLY_530_MachineLearning1/Lab2/letterdata.csv")
+str(letter_data)
+summary(letter_data)
+
+# converting the datatype of the letter attribute
+letter_data$letter = as.factor(letter_data$letter)
+```
+
+### Step 2 Preparing the Data
+```{r prep3}
+letters_train = letter_data[1:18000, ]
+letters_test = letter_data[18001:20000, ]
+```
+
+### Step 3 Training a Model on the Data THIS IS INCORRECT LOOK INTO THIS ********
+```{r train3}
+#install.packages("kernlab")
+library(kernlab)
+
+letter_classifier = ksvm(letter ~., data = letters_train, kernel = "vanilladot")
+letter_classifier
+summary(letter_classifier)
+```
+A initial training error of 13.35% is seen.
+
+### Step 4 Model Performance Evaluation
+```{r model3}
+letter_predictions = predict(letter_classifier, letters_test)
+table(letter_predictions, letters_test$letter)
+
+agreement = letter_predictions == letters_test$letter
+table(agreement)
+```
+The model is currently showing an accuracy of 83.95%. 
+
+### Step 5 Trying Polynomial and RBF kernels to improve the result
+```{r poly3}
+# testing polynomial kernel 
+letter_classifier2 = ksvm(letter ~ ., data = letters_train, kernel = "polydot")
+letter_classifier2
+summary(letter_classifier2)
+
+letter_predictions2 = predict(letter_classifier2, letters_test)
+table(letter_predictions2, letters_test$letter)
+
+agreement2 = letter_predictions2 == letters_test$letter
+table(agreement2)
+
+# testing rbf kernel 
+letter_classifier3 = ksvm(letter ~ ., data = letters_train, kernel = "rbfdot")
+letter_classifier3
+summary(letter_classifier3)
+
+letter_predictions3 = predict(letter_classifier3, letters_test)
+table(letter_predictions3, letters_test$letter)
+
+agreement3 = letter_predictions3 == letters_test$letter
+table(agreement3)
+```
+
+Using the Polynomial Kernal the initial error rate remains the same, but it decreased to 4.8% when using the RBF kernel. Upon using the Polynomial Kernel, the model accuracy improves to 84% whereas using the RBF kernal, the accuracy of the model is improved further to 93.45%.
+
+
+## Lab 2 News popularity
+### Part 4
+
+### Loading & pre-processing the dataset 
+```{r warning=FALSE, message=FALSE}
+# loading the data and checking data structure
+news_data = read.csv("/Users/akhilasaineni/Downloads/HU/2020Fall/ANLY_530_MachineLearning1/Lab2/OnlineNewsPopularity_for_R.csv")
+str(news_data)
+summary(news_data)
+
+newsDF = data.frame(news_data$n_tokens_title, news_data$n_tokens_content, news_data$n_unique_tokens, news_data$n_non_stop_words, news_data$num_hrefs, news_data$num_imgs, news_data$num_videos, news_data$average_token_length, news_data$num_keywords, news_data$kw_max_max, news_data$global_sentiment_polarity, news_data$avg_positive_polarity, news_data$title_subjectivity, news_data$title_sentiment_polarity, news_data$abs_title_subjectivity, news_data$abs_title_sentiment_polarity, news_data$shares)
+
+colnames(newsDF) = c("n_tokens_title", "n_tokens_content", "n_unique_tokens", "n_non_stop_words", "num_hrefs", "num_imgs", "num_videos", "average_token_length", "num_keywords", "kw_max_max", "global_sentiment_polarity", "avg_positive_polarity", "title_subjectivity", "title_sentiment_polarity", "abs_title_subjectivity", "abs_title_sentiment_polarity", "shares")
+
+# creating a categorical variable
+newsDF$shares = as.factor(ifelse(newsDF$shares > 1400,1,0))
+
+# splitting into test and training sets
+set.seed(100)
+news_rand = newsDF[order(runif(10000)), ]
+
+news_train = news_rand[1:9000, ]
+news_test = news_rand[9001:10000, ]
+
+prop.table(table(news_train$shares))
+prop.table(table(news_test$shares))
+
+```
+
+### Part 1 Applying the Naive Bayes classifier on Online News popularity data set
+```{r online}
+library(naivebayes)
+
+naiveBayes_model_news = naive_bayes(as.character(shares) ~ ., data= news_train)
+naiveBayes_model_news
+
+# testing model accuracy
+naiveBayes_model_news_nat = table(predict(naiveBayes_model_news, news_test), news_test$shares)
+(Accuracy_News_NB = sum(diag(naiveBayes_model_news_nat))/sum(naiveBayes_model_news_nat)*100)
+```
+An accuracy of 52.6% is seen using the Naive Bayes classification model on the News dataset.
+
+### Part 2 Applying the SVM classifier on Online News popularity data set
+```{r svm}
+library(kernlab)
+
+# testing the linear kernel
+news_classifier1 = ksvm(shares ~., data = news_train, kernel = "vanilladot")
+news_classifier1
+summary(news_classifier1)
+
+news_predictions1 = predict(news_classifier1, news_test)
+table(news_predictions1, news_test$shares)
+
+agreement_news1 = news_predictions1 == news_test$shares
+table(agreement_news1)
+
+# testing the ploynomial kernel
+news_classifier2 = ksvm(shares ~., data = news_train, kernel = "polydot")
+news_classifier2
+summary(news_classifier2)
+
+news_predictions2 = predict(news_classifier2, news_test)
+table(news_predictions2, news_test$shares)
+
+agreement_news2 = news_predictions2 == news_test$shares
+table(agreement_news2)
+
+# testing the rbf kernel
+news_classifier3 = ksvm(shares ~., data = news_train, kernel = "rbfdot")
+news_classifier3
+summary(news_classifier3)
+
+news_predictions3 = predict(news_classifier3, news_test)
+table(news_predictions3, news_test$shares)
+
+agreement_news3 = news_predictions3 == news_test$shares
+table(agreement_news3)
+
+```
+The SVM classification model is tested on the News dataset, the Linear kernal shows an initial training error of 46.35%, with a final model accuracy of 54.3%. The Ploynomial kernal shows a similar initial training error of 46.35%, with a final model accuracy of 54.7%. The Linear kernal shows an initial training error of 36.61%, with a final model accuracy of 56.6%. In this case, the RBF kernal performed the best. 
+
+## Summary  
+The aim of this assignment was to explore the 2 given datasets so as to improve the understanding of how the Naive Bayes and SVM classification algorithms work. The News dataset is tested for all the above algorithms, with the final model built by both the Naive Bayes and SVM algorithms receiving a decent model accuracy of 51.9% and 56.6% respectively.
+
+
+
+
+
+
+
+
+
+
+
+
+
